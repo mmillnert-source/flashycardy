@@ -1,0 +1,64 @@
+---
+description: Clerk handles all authentication; every data access must be scoped to the authenticated user
+alwaysApply: true
+---
+
+# Clerk Auth & User Data Isolation
+
+All authentication is handled by **Clerk**. Every server action, route handler, and server component that touches user data MUST:
+
+1. Resolve the current user via Clerk (`auth()` from `@clerk/nextjs/server`).
+2. Reject the request if there is no `userId` (return/throw — never fall through).
+3. Scope **every** query, insert, update, and delete by that `userId` (or by verifying ownership of the parent record).
+
+Never trust a `userId` (or any owner id) that comes from the client — always read it from Clerk on the server.
+
+## Rules
+
+- Import auth on the server: `import { auth } from "@clerk/nextjs/server";`
+- Call `const { userId } = await auth();` and bail out if it's falsy.
+- Filter reads with `eq(table.userId, userId)` (or join through an owned parent, e.g. cards → deck.userId).
+- On writes, set `userId` from Clerk, and verify ownership of any target row before mutating.
+- Never accept `userId` / `ownerId` from form data, request body, params, or client components.
+- Do not expose other users' rows, even by id — a "not found" response is correct when the row exists but isn't owned by the caller.
+
+## Examples
+
+```typescript
+// BAD — trusts client-supplied userId, no ownership check
+"use server";
+export async function deleteDeck(deckId: number, userId: string) {
+  await db.delete(decksTable).where(eq(decksTable.id, deckId));
+}
+```
+
+```typescript
+// GOOD — userId comes from Clerk, query is scoped to the owner
+"use server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { decksTable } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+
+export async function deleteDeck(deckId: number) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  await db
+    .delete(decksTable)
+    .where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)));
+}
+```
+
+```typescript
+// GOOD — verify ownership of the parent deck before touching a card
+const { userId } = await auth();
+if (!userId) throw new Error("Unauthorized");
+
+const deck = await db.query.decksTable.findFirst({
+  where: (d, { and, eq }) => and(eq(d.id, deckId), eq(d.userId, userId)),
+});
+if (!deck) throw new Error("Not found");
+
+await db.insert(cardsTable).values({ deckId, front, back });
+```

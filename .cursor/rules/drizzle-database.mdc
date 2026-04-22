@@ -1,0 +1,46 @@
+---
+description: Database interactions must use Drizzle ORM with the project schema and query builder
+alwaysApply: true
+---
+
+# Drizzle for All Database Access
+
+All database interactions MUST go through Drizzle: import the `db` client from `@/db` and use the typed schema in `@/db/schema`. Never bypass Drizzle with raw SQL strings, raw drivers (e.g. `pg`, `neon` HTTP client directly), or hand-written query strings.
+
+## Rules
+
+- Import the client: `import { db } from "@/db";`
+- Import tables/relations from `@/db/schema` (e.g. `decksTable`, `cardsTable`).
+- Use Drizzle's query builder (`db.select()`, `db.insert()`, `db.update()`, `db.delete()`) or relational queries (`db.query.*`).
+- Use inferred types (`Deck`, `NewDeck`, `Card`, `NewCard`) from `@/db/schema` instead of redefining row shapes.
+- Schema changes happen in `src/db/schema.ts`, then run `drizzle-kit` migrations — never mutate the DB ad hoc.
+- If a raw SQL fragment is truly required, use Drizzle's `sql` tag (`import { sql } from "drizzle-orm"`), not string concatenation.
+
+## Examples
+
+```typescript
+// BAD — raw client / raw SQL bypasses the schema and types
+import { neon } from "@neondatabase/serverless";
+const sql = neon(process.env.DATABASE_URL!);
+const decks = await sql`SELECT * FROM decks WHERE user_id = ${userId}`;
+```
+
+```typescript
+// GOOD — Drizzle client + schema + query builder
+import { db } from "@/db";
+import { decksTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+const decks = await db
+  .select()
+  .from(decksTable)
+  .where(eq(decksTable.userId, userId));
+```
+
+```typescript
+// GOOD — relational query API
+const deckWithCards = await db.query.decksTable.findFirst({
+  where: (d, { eq }) => eq(d.id, deckId),
+  with: { cards: true },
+});
+```

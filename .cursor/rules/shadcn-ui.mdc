@@ -1,0 +1,24 @@
+---
+alwaysApply: false
+---
+# shadcn/ui
+
+- Build all UI with [shadcn/ui](https://ui.shadcn.com/) primitives and patterns. Prefer importing from the project’s shadcn components (e.g. `components/ui/*`) over ad-hoc styled HTML for buttons, dialogs, forms, etc.
+
+## Project not set up yet
+
+If there is no shadcn setup (no `components.json` / shadcn config), initialize from the repo root:
+
+```bash
+npx shadcn@latest init
+```
+
+## Missing component
+
+If a component from the registry is not installed, add it by name from the repo root (example: `button`):
+
+```bash
+npx shadcn@latest add button
+```
+
+Replace `button` with the component you need (`dialog`, `input`, `dropdown-menu`, etc.).
