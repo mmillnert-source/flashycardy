@@ -1,9 +1,14 @@
+import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import {
   SignInCtaButton,
   SignUpCtaButton,
 } from "@/components/auth-buttons";
 
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
+  if (userId) redirect("/dashboard");
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">
